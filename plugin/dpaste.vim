@@ -3,68 +3,62 @@
 " Maintainer:   Bartek Ciszkowski <bart.ciszk@gmail.com>
 " Version:      0.1
 "
-" Thanks To: 
+" Thanks To:
 "   - Paul Bissex (pbx on irc) for creating dpaste :)
 "   - The creator of the LodgeIt.vim plugin, in which I blatantly steal some
 "   vim specific code from.
 "
 " Usage:
 "   :Dpaste     create a paste from the current buffer or selection.
-"   
+"
 " You can also map paste to CTRL + P, just add this to your .vimrc:
 " map ^P :Dpaste<CR>
 " (Where ^P is entered using CTRL + V, CTRL + P in Vim)
 
 function! s:DpasteInit()
-python << EOF
+python3 << EOF
 
 import vim
-import urllib2, urllib
+import requests
 
 
 # This mapping can be fleshed out a bit, but it's the best I could do in 5 minutes.
 syntax_mapping = {
-    'python':           'Python',
-    'sql':              'Sql',
-    'htmldjango':       'DjangoTemplate',
-    'javascript':       'JScript',
-    'css':              'Css',
-    'xml':              'Xml',
-    'ruby':             'Ruby',
-    'haskell':          'Haskell',
+    'python':           'python',
+    'sql':              'sql',
+    'htmldjango':       'html+django',
+    'javascript':       'js',
+    'css':              'css',
+    'xml':              'xml',
+    'ruby':             'ruby',
+    'haskell':          'haskell',
 }
 
 syntax_reverse_mapping = {}
-for key, value in syntax_reverse_mapping.iteritems():
+for key, value in syntax_reverse_mapping.items():
         syntax_reverse_mapping[value] = key
 
-def new_paste(**paste_data):
+def new_paste(paste_data):
     """
     The function that does all the magic work
     """
 
-    url = "http://dpaste.com/api/v1/"
-    data = urllib.urlencode(paste_data)
-
+    url = "http://dpaste.com/api/v2/"
     try:
-        req = urllib2.Request(url)
-        fd = urllib2.urlopen(req, data)
-    except urllib2.URLError:
+        r = requests.post(url, data=paste_data)
+    except Exception:
         return False
-
-    return fd.geturl()
-
-def make_utf8(code):
-    enc = vim.eval('&fenc') or vim.eval('&enc')
-    return code.decode(enc, 'ignore').encode('utf-8')
-
+    if r.status_code == 201:
+        return r.content.rstrip()
+    else:
+        return False
 EOF
 endfunction
 
 
 function! s:Dpasteit(line1,line2,count,...)
 call s:DpasteInit()
-python << endpython
+python3 << endpython
 
 # new paste
 if vim.eval('a:0') != '1':
@@ -76,21 +70,21 @@ if vim.eval('a:0') != '1':
     else:
         code = "\n".join(vim.current.buffer)
 
-    code = make_utf8(code)
+    #code = make_utf8(code)
 
-    syntax = syntax_mapping.get(vim.eval('&ft'), '')
+    syntax = syntax_mapping.get(vim.eval('&ft'), 'text')
 
-    paste_data = dict(language=syntax, content=code)
+    paste_data = {'syntax': syntax, 'content': code}
 
-    paste_url = new_paste(**paste_data)
+    paste_url = new_paste(paste_data)
 
     if paste_url:
-        print "Pasted content to %s" % (paste_url)
+        print("Pasted content to {}".format(paste_url.decode('utf-8')))
 
         vim.command('setlocal nomodified')
         vim.command('let b:dpaste_url="%s"' % paste_url)
     else:
-        print "Could not connect."
+        print("Could not connect.")
 
 
 endpython
